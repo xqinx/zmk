@@ -143,6 +143,7 @@
                     &kp K_MUTE &kp LGUI &mo L1 &kp LCTRL &kp SPACE &kp BSPC    &gresc &kp RET &kp LALT &mo L2 &kp COLON &none
                 >;
 
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN>;
         };
 
         l1_layer {
@@ -160,6 +161,9 @@
                            &trans &trans &trans &trans &trans &vim_window_focus   &kp LG(LS(N4)) &trans &kp N0 &trans &trans &trans
                 >;
 
+            // vim buffer switch, vim split size change
+            sensor-bindings = <&inc_dec_kp RA(N) RA(P) &inc_dec_kp RA(DOT) RA(COMMA)>;
+            // sensor-bindings = <&enc_vim_buf_sw &enc_vim_size>;
         };
 
         l2_layer {
@@ -178,6 +182,9 @@
                             &trans &trans &trans &trans &trans &tmux_pane_focus    &bt BT_CLR &out OUT_BLE &out OUT_USB &trans &kp RALT &trans
                 >;
 
+            // tmux window switch, tmux winows size
+            // sensor-bindings = <&inc_dec_kp LC(H) LC(L) &inc_dec_kp LS(L) LS(H)>;
+            sensor-bindings = <&enc_tmux_win_sw &enc_tmux_size>;
         };
     };
 };
