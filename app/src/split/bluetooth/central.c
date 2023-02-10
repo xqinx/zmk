@@ -20,15 +20,15 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/stdlib.h>
 #include <zmk/ble.h>
 #include <zmk/behavior.h>
+#include <zmk/sensors.h>
 #include <zmk/split/bluetooth/uuid.h>
 #include <zmk/split/bluetooth/service.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/position_state_changed.h>
+#include <zmk/events/sensor_event.h>
 #include <init.h>
 
 static int start_scan(void);
-
-#define POSITION_STATE_DATA_LEN 16
 
 enum peripheral_slot_state {
     PERIPHERAL_SLOT_STATE_OPEN,
@@ -42,9 +42,21 @@ struct peripheral_slot {
     struct bt_gatt_discover_params discover_params;
     struct bt_gatt_subscribe_params subscribe_params;
     struct bt_gatt_discover_params sub_discover_params;
+#if ZMK_KEYMAP_HAS_SENSORS
+    struct bt_gatt_subscribe_params sensor_subscribe_params;
+    struct bt_gatt_discover_params sensor_sub_discover_params;
+#endif
     uint16_t run_behavior_handle;
-    uint8_t position_state[POSITION_STATE_DATA_LEN];
-    uint8_t changed_positions[POSITION_STATE_DATA_LEN];
+    uint8_t position_state[ZMK_SPLIT_POS_STATE_LEN];
+    uint8_t changed_positions[ZMK_SPLIT_POS_STATE_LEN];
+};
+
+union zmk_split_notify_data {
+    struct zmk_split_notify_data_header {
+        const zmk_split_notify_data_t type;
+    } header;
+    struct zmk_split_notify_data_position position;
+    struct zmk_split_notify_data_sensor sensor;
 };
 
 static struct peripheral_slot peripherals[ZMK_BLE_SPLIT_PERIPHERAL_COUNT];
@@ -63,6 +75,21 @@ void peripheral_event_work_callback(struct k_work *work) {
 }
 
 K_WORK_DEFINE(peripheral_event_work, peripheral_event_work_callback);
+
+#if ZMK_KEYMAP_HAS_SENSORS
+K_MSGQ_DEFINE(peripheral_sensor_event_msgq, sizeof(struct zmk_sensor_event),
+              CONFIG_ZMK_SPLIT_BLE_CENTRAL_POSITION_QUEUE_SIZE, 4);
+
+void peripheral_sensor_event_work_callback(struct k_work *work) {
+    struct zmk_sensor_event ev;
+    while (k_msgq_get(&peripheral_sensor_event_msgq, &ev, K_NO_WAIT) == 0) {
+        LOG_DBG("Trigger sensor state change for %d", ev.sensor_number);
+        ZMK_EVENT_RAISE(new_zmk_sensor_event(ev));
+    }
+}
+
+K_WORK_DEFINE(peripheral_sensor_event_work, peripheral_sensor_event_work_callback);
+#endif
 
 int peripheral_slot_index_for_conn(struct bt_conn *conn) {
     for (int i = 0; i < ZMK_BLE_SPLIT_PERIPHERAL_COUNT; i++) {
@@ -103,7 +130,7 @@ int release_peripheral_slot(int index) {
     slot->state = PERIPHERAL_SLOT_STATE_OPEN;
 
     // Raise events releasing any active positions from this peripheral
-    for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
+    for (int i = 0; i < ZMK_SPLIT_POS_STATE_LEN; i++) {
         for (int j = 0; j < 8; j++) {
             if (slot->position_state[i] & BIT(j)) {
                 uint32_t position = (i * 8) + j;
@@ -118,13 +145,14 @@ int release_peripheral_slot(int index) {
         }
     }
 
-    for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
+    for (int i = 0; i < ZMK_SPLIT_POS_STATE_LEN; i++) {
         slot->position_state[i] = 0U;
         slot->changed_positions[i] = 0U;
     }
 
     // Clean up previously discovered handles;
     slot->subscribe_params.value_handle = 0;
+    slot->sensor_subscribe_params.value_handle = 0;
     slot->run_behavior_handle = 0;
 
     return 0;
@@ -180,40 +208,54 @@ static uint8_t split_central_notify_func(struct bt_conn *conn,
 
     LOG_DBG("[NOTIFICATION] data %p length %u", data, length);
 
-    for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
-        slot->changed_positions[i] = ((uint8_t *)data)[i] ^ slot->position_state[i];
-        slot->position_state[i] = ((uint8_t *)data)[i];
-        LOG_DBG("data: %d", slot->position_state[i]);
-    }
-
-    for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
-        for (int j = 0; j < 8; j++) {
-            if (slot->changed_positions[i] & BIT(j)) {
-                uint32_t position = (i * 8) + j;
-                bool pressed = slot->position_state[i] & BIT(j);
-                struct zmk_position_state_changed ev = {.source =
-                                                            peripheral_slot_index_for_conn(conn),
-                                                        .position = position,
-                                                        .state = pressed,
-                                                        .timestamp = k_uptime_get()};
-
-                k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
-                k_work_submit(&peripheral_event_work);
+    const union zmk_split_notify_data *payload_data = (const union zmk_split_notify_data *)(data);
+    switch (payload_data->header.type) {
+        case ZMK_SPLIT_NOTIFIY_DATA_POS:
+            for (int i = 0; i < ZMK_SPLIT_POS_STATE_LEN; i++) {
+                slot->changed_positions[i] = payload_data->position.position_state[i] ^ slot->position_state[i];
+                slot->position_state[i] = payload_data->position.position_state[i];
+                LOG_DBG("data: %d", slot->position_state[i]);
             }
-        }
+
+            for (int i = 0; i < ZMK_SPLIT_POS_STATE_LEN; i++) {
+                for (int j = 0; j < 8; j++) {
+                    if (slot->changed_positions[i] & BIT(j)) {
+                        uint32_t position = (i * 8) + j;
+                        bool pressed = slot->position_state[i] & BIT(j);
+                        struct zmk_position_state_changed ev = {.source =
+                            peripheral_slot_index_for_conn(conn),
+                            .position = position,
+                            .state = pressed,
+                            .timestamp = k_uptime_get()};
+
+                        k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
+                        k_work_submit(&peripheral_event_work);
+                    }
+                }
+            }
+            break;
+#if ZMK_KEYMAP_HAS_SENSORS
+        case ZMK_SPLIT_NOTIFIY_DATA_SENSOR:
+            LOG_DBG("sensor: %d", payload_data->sensor.sensor_number);
+            struct zmk_sensor_event ev = {
+                .sensor_number = payload_data->sensor.sensor_number,
+                .value = {.val1 = payload_data->sensor.value.val1,
+                    .val2 = payload_data->sensor.value.val2},
+                .timestamp = k_uptime_get()};
+            k_msgq_put(&peripheral_sensor_event_msgq, &ev, K_NO_WAIT);
+            k_work_submit(&peripheral_sensor_event_work);
+            break;
+#endif
+        default:
+            LOG_ERR("Unknown split payload data type");
     }
+
 
     return BT_GATT_ITER_CONTINUE;
 }
 
-static void split_central_subscribe(struct bt_conn *conn) {
-    struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
-    if (slot == NULL) {
-        LOG_ERR("No peripheral state found for connection");
-        return;
-    }
-
-    int err = bt_gatt_subscribe(conn, &slot->subscribe_params);
+static void split_central_subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *params) {
+    int err = bt_gatt_subscribe(conn, params);
     switch (err) {
     case -EALREADY:
         LOG_DBG("[ALREADY SUBSCRIBED]");
@@ -260,15 +302,35 @@ static uint8_t split_central_chrc_discovery_func(struct bt_conn *conn,
         slot->subscribe_params.value_handle = bt_gatt_attr_value_handle(attr);
         slot->subscribe_params.notify = split_central_notify_func;
         slot->subscribe_params.value = BT_GATT_CCC_NOTIFY;
-        split_central_subscribe(conn);
+        split_central_subscribe(conn, &slot->subscribe_params);;
     } else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
                             BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_RUN_BEHAVIOR_UUID))) {
         LOG_DBG("Found run behavior handle");
         slot->run_behavior_handle = bt_gatt_attr_value_handle(attr);
+        slot->discover_params.uuid = NULL;
+        slot->discover_params.start_handle = attr->handle + 2;
+        slot->discover_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
     }
+#if ZMK_KEYMAP_HAS_SENSORS
+    else if (!bt_uuid_cmp(((struct bt_gatt_chrc *)attr->user_data)->uuid,
+                            BT_UUID_DECLARE_128(ZMK_SPLIT_BT_CHAR_SENSOR_STATE_UUID))) {
+        LOG_DBG("Found sensor event characteristic");
+        memcpy(&slot->sensor_sub_discover_params.uuid, BT_UUID_GATT_CCC, sizeof(slot->sensor_sub_discover_params.uuid));
+        slot->sensor_sub_discover_params.start_handle = attr->handle + 2;
+        slot->sensor_sub_discover_params.type = BT_GATT_DISCOVER_DESCRIPTOR;
+        slot->sensor_subscribe_params.disc_params = &slot->sensor_sub_discover_params;
+        slot->sensor_subscribe_params.end_handle = slot->discover_params.end_handle;
+        slot->sensor_subscribe_params.value_handle = bt_gatt_attr_value_handle(attr);
+        slot->sensor_subscribe_params.notify = split_central_notify_func;
+        slot->sensor_subscribe_params.value = BT_GATT_CCC_NOTIFY;
+        split_central_subscribe(conn, &slot->sensor_subscribe_params);;
+    }
+#endif
 
     bool subscribed = (slot->run_behavior_handle && slot->subscribe_params.value_handle);
-
+#if ZMK_KEYMAP_HAS_SENSORS
+    subscribed = subscribed && slot->sensor_subscribe_params.value_handle;
+#endif
     return subscribed ? BT_GATT_ITER_STOP : BT_GATT_ITER_CONTINUE;
 }
 
@@ -324,7 +386,7 @@ static void split_central_process_connection(struct bt_conn *conn) {
         return;
     }
 
-    if (!slot->subscribe_params.value_handle) {
+    if (!slot->subscribe_params.value_handle || !slot->sensor_subscribe_params.value_handle) {
         slot->discover_params.uuid = &split_service_uuid.uuid;
         slot->discover_params.func = split_central_service_discovery_func;
         slot->discover_params.start_handle = 0x0001;
