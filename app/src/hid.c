@@ -16,6 +16,8 @@ static struct zmk_hid_keyboard_report keyboard_report = {
 
 static struct zmk_hid_consumer_report consumer_report = {.report_id = 2, .body = {.keys = {0}}};
 
+static struct zmk_hid_mouse_report mouse_report = {
+    .report_id = 4, .body = {.buttons = 0, .x = 0, .y = 0, .scroll_x = 0, .scroll_y = 0}};
 // Keep track of how often a modifier was pressed.
 // Only release the modifier if the count is 0.
 static int explicit_modifier_counts[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -234,6 +236,14 @@ bool zmk_hid_consumer_is_pressed(zmk_key_t key) {
     return false;
 }
 
+void zmk_hid_mouse_clear() { memset(&mouse_report.body, 0, sizeof(mouse_report.body)); }
+
+void zmk_hid_mouse_movement_set(int16_t x, int16_t y) {
+    mouse_report.body.x = x;
+    mouse_report.body.y = y;
+    LOG_DBG("Mouse movement set to 0x%02X 0x%02X ", mouse_report.body.x, mouse_report.body.y);
+}
+
 int zmk_hid_press(uint32_t usage) {
     switch (ZMK_HID_USAGE_PAGE(usage)) {
     case HID_USAGE_KEY:
@@ -270,4 +280,8 @@ struct zmk_hid_keyboard_report *zmk_hid_get_keyboard_report() {
 
 struct zmk_hid_consumer_report *zmk_hid_get_consumer_report() {
     return &consumer_report;
+}
+
+struct zmk_hid_mouse_report *zmk_hid_get_mouse_report() {
+    return &mouse_report;
 }

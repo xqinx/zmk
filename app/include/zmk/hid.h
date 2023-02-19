@@ -89,6 +89,68 @@ static const uint8_t zmk_hid_report_desc[] = {
     /* INPUT (Data,Ary,Abs) */
     HID_INPUT(0x00),
     HID_END_COLLECTION,
+
+    HID_USAGE_PAGE(HID_USAGE_GD),
+    HID_USAGE(HID_USAGE_GD_MOUSE),
+    HID_COLLECTION(HID_COLLECTION_APPLICATION),
+    HID_REPORT_ID(0x04),
+    HID_USAGE(HID_USAGE_GD_POINTER),
+    HID_COLLECTION(HID_COLLECTION_PHYSICAL),
+    HID_USAGE_PAGE(HID_USAGE_BUTTON),
+    HID_USAGE_MIN8(0x01),
+    HID_USAGE_MAX8(0x10),
+    HID_LOGICAL_MIN8(0x00),
+    HID_LOGICAL_MAX8(0x01),
+    HID_REPORT_SIZE(0x01),
+    HID_REPORT_COUNT(0x10),
+    /* INPUT (Data,Var,Abs) */
+    HID_INPUT(0x02),
+
+    HID_USAGE_PAGE(HID_USAGE_GD),
+    /* LOGICAL_MINIMUM (-32767) */
+    HID_LOGICAL_MIN16(0x01, 0x80),
+    /* LOGICAL_MAXIMUM (32767) */
+    HID_LOGICAL_MAX16(0xFF, 0x7F),
+    /* REPORT_SIZE (16) */
+    HID_REPORT_SIZE(0x10),
+    /* REPORT_COUNT (2) */
+    HID_REPORT_COUNT(0x02),
+    /* USAGE (X) */ // Vertical scroll
+    HID_USAGE(HID_USAGE_GD_X),
+    /* USAGE (Y) */
+    HID_USAGE(HID_USAGE_GD_Y),
+    /* Input (Data,Var,Rel) */
+    HID_INPUT(0x06),
+    /* LOGICAL_MINIMUM (-127) */
+    HID_LOGICAL_MIN8(0x81),
+    /* LOGICAL_MAXIMUM (127) */
+    HID_LOGICAL_MAX8(0x7F),
+    /* REPORT_SIZE (8) */
+    HID_REPORT_SIZE(0x08),
+    /* REPORT_COUNT (1) */
+    HID_REPORT_COUNT(0x01),
+    /* USAGE (Wheel) */
+    HID_USAGE(HID_USAGE_GD_WHEEL),
+    /* Input (Data,Var,Rel) */
+    HID_INPUT(0x06),
+    /* USAGE_PAGE (Consumer) */ // Horizontal scroll
+    HID_USAGE_PAGE(HID_USAGE_CONSUMER),
+    /* USAGE (AC Pan) */
+    0x0A,
+    0x38,
+    0x02,
+    /* LOGICAL_MINIMUM (-127) */
+    HID_LOGICAL_MIN8(0x81),
+    /* LOGICAL_MAXIMUM (127) */
+    HID_LOGICAL_MAX8(0x7F),
+    /* REPORT_COUNT (1) */
+    HID_REPORT_COUNT(0x01),
+    /* Input (Data,Var,Rel) */
+    HID_INPUT(0x06),
+    /* END COLLECTION */
+    HID_END_COLLECTION,
+    /* END COLLECTION */
+    HID_END_COLLECTION,
 };
 
 // struct zmk_hid_boot_report
@@ -126,6 +188,19 @@ struct zmk_hid_consumer_report {
     struct zmk_hid_consumer_report_body body;
 } __packed;
 
+struct zmk_hid_mouse_report_body {
+    uint16_t buttons;
+    int16_t x;
+    int16_t y;
+    int8_t scroll_y;
+    int8_t scroll_x;
+} __packed;
+
+struct zmk_hid_mouse_report {
+    uint8_t report_id;
+    struct zmk_hid_mouse_report_body body;
+} __packed;
+
 zmk_mod_flags_t zmk_hid_get_explicit_mods();
 int zmk_hid_register_mod(zmk_mod_t modifier);
 int zmk_hid_unregister_mod(zmk_mod_t modifier);
@@ -148,9 +223,13 @@ int zmk_hid_consumer_release(zmk_key_t key);
 void zmk_hid_consumer_clear();
 bool zmk_hid_consumer_is_pressed(zmk_key_t key);
 
+void zmk_hid_mouse_clear();
+void zmk_hid_mouse_movement_set(int16_t x, int16_t y);
+
 int zmk_hid_press(uint32_t usage);
 int zmk_hid_release(uint32_t usage);
 bool zmk_hid_is_pressed(uint32_t usage);
 
 struct zmk_hid_keyboard_report *zmk_hid_get_keyboard_report();
 struct zmk_hid_consumer_report *zmk_hid_get_consumer_report();
+struct zmk_hid_mouse_report *zmk_hid_get_mouse_report();
