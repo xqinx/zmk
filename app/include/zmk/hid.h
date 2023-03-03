@@ -224,6 +224,8 @@ void zmk_hid_consumer_clear();
 bool zmk_hid_consumer_is_pressed(zmk_key_t key);
 
 void zmk_hid_mouse_clear();
+void zmk_hid_mouse_button_set(uint16_t button);
+void zmk_hid_mouse_button_clear(uint16_t button);
 void zmk_hid_mouse_movement_set(int16_t x, int16_t y);
 
 int zmk_hid_press(uint32_t usage);

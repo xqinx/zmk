@@ -6,6 +6,7 @@
 
 #include "zmk/keys.h"
 #include <zephyr/logging/log.h>
+#include <stdint.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include <zmk/hid.h>
@@ -242,6 +243,16 @@ void zmk_hid_mouse_movement_set(int16_t x, int16_t y) {
     mouse_report.body.x = x;
     mouse_report.body.y = y;
     LOG_DBG("Mouse movement set to 0x%02X 0x%02X ", mouse_report.body.x, mouse_report.body.y);
+}
+
+void zmk_hid_mouse_button_set(uint16_t button) {
+    mouse_report.body.buttons |= button;
+    LOG_DBG("Mouse button set to 0x%02X", mouse_report.body.buttons);
+}
+
+void zmk_hid_mouse_button_clear(uint16_t button) {
+    mouse_report.body.buttons &= ~button;
+    LOG_DBG("Mouse button set to 0x%02X", mouse_report.body.buttons);
 }
 
 int zmk_hid_press(uint32_t usage) {

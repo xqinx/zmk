@@ -1,0 +1,15 @@
+/*
+ * Copyright (c) 2023 The ZMK Contributors
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+ / {
+	behaviors {
+		/omit-if-no-ref/ mb: behavior_mouse_button {
+			compatible = "zmk,behavior-mouse-button";
+			label = "MOUSE BUTTON";
+			#binding-cells = <1>;
+		};
+	};
+};

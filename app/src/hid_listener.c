@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "zmk/events/mouse_button_state_changed.h"
 #include <drivers/behavior.h>
 #include <zephyr/logging/log.h>
 
@@ -94,8 +95,18 @@ int hid_listener(const zmk_event_t *eh) {
             hid_listener_keycode_released(ev);
         }
     }
+    const struct zmk_mouse_button_state_changed *mb_ev = as_zmk_mouse_button_state_changed(eh);
+    if (mb_ev) {
+        if (mb_ev->state) {
+            zmk_hid_mouse_button_set(mb_ev->buttons);
+        } else {
+            zmk_hid_mouse_button_clear(mb_ev->buttons);
+        }
+        return zmk_endpoints_send_mouse_report();
+    }
     return 0;
 }
 
 ZMK_LISTENER(hid_listener, hid_listener);
 ZMK_SUBSCRIPTION(hid_listener, zmk_keycode_state_changed);
+ZMK_SUBSCRIPTION(hid_listener, zmk_mouse_button_state_changed);
