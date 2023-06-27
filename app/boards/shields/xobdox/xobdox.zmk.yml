@@ -1,0 +1,12 @@
+file_format: "1"
+id: xobdox
+name: xobdox
+type: shield
+url: https://github.com/xqinx/xobdox
+requires: [seeed_xiao_ble]
+features:
+  - keys
+  - encoder
+siblings:
+  - xobdox_left
+  - xobdox_right

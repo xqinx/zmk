@@ -1,0 +1,183 @@
+/*
+ * Copyright (c) 2022 Xiao Qin
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/bt.h>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/outputs.h>
+
+// Layers
+#define BASE 0
+#define L1   1
+#define L2   2
+
+&caps_word {
+    continue-list = <UNDERSCORE MINUS LSHFT>;
+};
+
+/ {
+    macros {
+        ZMK_MACRO(vim_window_focus,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(W) &kp LC(W)>;
+        )
+        ZMK_MACRO(vim_buffer_next,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp COLON &kp B &kp N &kp RET>;
+        )
+        ZMK_MACRO(vim_buffer_prev,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp COLON &kp B &kp P &kp RET>;
+        )
+        ZMK_MACRO(vim_split_inc,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(W) &kp GT>;
+        )
+        ZMK_MACRO(vim_split_dec,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(W) &kp LT>;
+        )
+        ZMK_MACRO(tmux_pane_focus,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(B) &kp O>;
+        )
+        ZMK_MACRO(tmux_window_next,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(B) &kp LC(L)>;
+        )
+        ZMK_MACRO(tmux_window_prev,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(B) &kp LC(H)>;
+        )
+        ZMK_MACRO(tmux_pane_inc,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(B) &kp LS(L)>;
+        )
+        ZMK_MACRO(tmux_pane_dec,
+                wait-ms = <30>;
+                tap-ms = <40>;
+                bindings = <&kp LC(B) &kp LS(H)>;
+        )
+
+    };
+
+    behaviors {
+        td_dash: tap_dance_dash {
+            compatible = "zmk,behavior-tap-dance";
+            label = "TAP_DANCE_DASH";
+            #binding-cells = <0>;
+            tapping-term-ms = <150>;
+            bindings = <&kp MINUS>, <&kp UNDER>;
+        };
+        td_quote: tap_dance_quote {
+            compatible = "zmk,behavior-tap-dance";
+            label = "TAP_DANCE_QUOTE";
+            #binding-cells = <0>;
+            tapping-term-ms = <150>;
+            bindings = <&kp SQT>, <&kp DQT>;
+        };
+        td_slash: tap_dance_slash {
+            compatible = "zmk,behavior-tap-dance";
+            label = "TAP_DANCE_SLASH";
+            #binding-cells = <0>;
+            tapping-term-ms = <150>;
+            bindings = <&kp FSLH>, <&kp QMARK>;
+        };
+
+        enc_vim_buf_sw: encoder_vim_buffer_switch {
+            compatible = "zmk,behavior-sensor-rotate";
+            label = "ENC_VIM_BUF";
+            #sensor-binding-cells = <0>;
+            bindings = <&vim_buffer_prev>, <&vim_buffer_next>;
+        };
+
+        enc_vim_size: encoder_vim_split_size_change {
+            compatible = "zmk,behavior-sensor-rotate";
+            label = "ENC_VIM_SIZE";
+            #sensor-binding-cells = <0>;
+            bindings = <&vim_split_dec>, <&vim_split_inc>;
+        };
+
+        enc_tmux_win_sw: encoder_tmux_window_switch {
+            compatible = "zmk,behavior-sensor-rotate";
+            label = "ENC_TMUX_WIN";
+            #sensor-binding-cells = <0>;
+            bindings = <&tmux_window_prev>, <&tmux_window_next>;
+        };
+
+        enc_tmux_size: encoder_tmux_pane_size_change {
+            compatible = "zmk,behavior-sensor-rotate";
+            label = "ENC_TMUX_SIZE";
+            #sensor-binding-cells = <0>;
+            bindings = <&tmux_pane_dec>, <&tmux_pane_inc>;
+        };
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        base_layer {
+            // --------------------------------------------------------------------------------------------------
+            // | TAB  |  Q  |  W  |  E  |  R  |  T  |                      |  Y  |  U  |  I  |  O  |  P  | -(_) |
+            // | BKSP |  A  |  S  |  D  |  F  |  G  |                      |  H  |  J  |  K  |  L  |;/L1 | '(") |
+            // | SHFT |  Z  |  X  |  C  |  V  |  B  |                      |  N  |  M  |  ,  |  .  | /(?)| =/+  |
+            //
+            //     (ec2-MUTE) | GUI | L1  | CTL | SPC | | BKSP |     | ESC | | RET | ALT | L2  | : | (ec2)
+            // --------------------------------------------------------------------------------------------------
+            bindings = <
+                &kp TAB    &kp Q  &kp W  &kp E  &kp R  &kp T                      &kp Y  &kp U  &kp I     &kp O   &kp P       &td_dash
+                &kp BSPC   &kp A  &kp S  &kp D  &kp F  &kp G                      &kp H  &kp J  &kp K     &kp L   &lt L1 SEMI &td_quote
+                &sk LSHFT  &kp Z  &kp X  &kp C  &kp V  &kp B                      &kp N  &kp M  &kp COMMA &kp DOT &td_slash   &mt RSHIFT EQUAL
+                    &kp K_MUTE &kp LGUI &mo L1 &kp LCTRL &kp SPACE &kp BSPC    &gresc &kp RET &kp LALT &mo L2 &kp COLON &none
+                >;
+
+        };
+
+        l1_layer {
+            // --------------------------------------------------------------------------------------------------
+            // | ESC  |  !  |  @  |  {  |  }  |  |  |                  |  \  |  7  |  8  |  9  | _  | BKSP |
+            // | DEL  |  #  |  $  |  (  |  )  |  `  |                  |  *  | 4  |  5  |  6  |;/L1 |  "  |
+            // | SHFT |  %  |  ^  |  [  |  ]  |  ~  |                  |  &  |  1  |  2  |  3  |  ?  | + |
+            //
+            //              | x | x | x | x | x | | vim_fcs |    | SCNCAP | | x | 0 | x | x | x |
+            // --------------------------------------------------------------------------------------------------
+            bindings = <
+                &kp ESC    &kp EXCL &kp AT &kp LBRC  &kp RBRC  &kp PIPE               &kp BSLH  &kp N7  &kp N8  &kp N9  &kp UNDER &kp BSPC
+                &kp DEL    &kp HASH &kp DLLR &kp LPAR  &kp RPAR  &kp GRAVE            &kp STAR  &kp N4  &kp N5  &kp N6  &lt L1 SEMI &kp DQT
+                &sk LSHFT  &kp PRCNT &kp CARET &kp LBKT  &kp RBKT  &kp TILDE          &kp AMPS  &kp N1  &kp N2  &kp N3  &kp QMARK &mt RSHIFT PLUS
+                           &trans &trans &trans &trans &trans &vim_window_focus   &kp LG(LS(N4)) &trans &kp N0 &trans &trans &trans
+                >;
+
+        };
+
+        l2_layer {
+            // --------------------------------------------------------------------------------------------------
+            // | F1 | F2 | F3 |  F4 | F5 | F6 |                                 | bt1 | bt2 | bt3 | bt4 | PageUp | VolUp |
+            // | F7 | F8 | F9 | F10 | F11 | F12 |                               | <- | DOWN | UP  | -> | PageDown | VolDown |
+            // | CAPS_WORD | c-z | c-x | c-c  | c-v | c-b  |                    | HOME | END | MISSION | DESK<- | DESK-> | MUTE |
+            //
+            //             | x | x | x | x | x | | tmux_fcs |            |bt_clear| | OUT_BLE | | OUT_USB | x | RALT |  x  |
+            // --------------------------------------------------------------------------------------------------
+
+            bindings = <
+                &kp F1 &kp F2 &kp F3 &kp F4 &kp F5 &kp F6                             &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &kp PG_UP &kp C_VOL_UP
+                &kp F7 &kp F8 &kp F9 &kp F10 &kp F11 &kp F12                          &kp LEFT &kp DOWN &kp UP &kp RIGHT &kp PG_DN &kp C_VOL_DN
+                &caps_word &kp LG(Z) &kp LG(X) &kp LG(C) &kp LG(V) &kp LG(B)          &kp HOME &kp END &kp LC(UP) &kp LC(LEFT) &kp LC(RIGHT) &kp K_MUTE
+                            &trans &trans &trans &trans &trans &tmux_pane_focus    &bt BT_CLR &out OUT_BLE &out OUT_USB &trans &kp RALT &trans
+                >;
+
+        };
+    };
+};
